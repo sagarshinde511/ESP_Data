@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 # Streamlit App
-st.title("API Data Viewer")
+st.title("ESP Data Reader")
 
 # Input for API URL
 api_url = "https://aeprojecthub.in/getdata.php?id=1&C=F1";
@@ -15,7 +15,6 @@ if api_url:  # Check if the user entered an API URL
         # Check if the request was successful
         if response.status_code == 200:
             data = response.text  # Get the data in string format
-            st.success("Data fetched successfully!")
             st.text(data)  # Display the data as plain text
         else:
             st.error(f"Failed to fetch data. Status Code: {response.status_code}")
