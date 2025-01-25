@@ -26,4 +26,4 @@ while True:
     
     # Wait for 1 second before refreshing
     time.sleep(1)
-    st.experimental_rerun()  # Rerun the app
+    #st.experimental_rerun()  # Rerun the app
