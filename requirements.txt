@@ -1,5 +1,4 @@
 streamlit
-mysql-connector-python
-Pandas
-folium
-streamlit_folium
+pandas
+numpy
+scikit-learn
