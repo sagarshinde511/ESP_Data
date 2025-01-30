@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from fpdf import FPDF
 
 def evaluate_answers(correct_answers, student_answers):
     vectorizer = TfidfVectorizer()
@@ -48,6 +49,23 @@ def evaluate_answers(correct_answers, student_answers):
     student_answers['Marks_Obtained'] = marks_obtained
     return student_answers
 
+def generate_pdf(results, total_marks_obtained, total_max_marks):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Student Evaluation Report", ln=True, align='C')
+    pdf.ln(10)
+    
+    for index, row in results.iterrows():
+        pdf.cell(200, 10, txt=f"Q{row['Question']}: {row['Marks_Obtained']} marks", ln=True)
+    
+    pdf.ln(10)
+    pdf.cell(200, 10, txt=f"Total Marks Obtained: {total_marks_obtained} / {total_max_marks}", ln=True)
+    
+    pdf_output = "evaluation_results.pdf"
+    pdf.output(pdf_output)
+    return pdf_output
+
 # Streamlit UI
 st.title("📊 Student Answer Evaluation System")
 
@@ -70,6 +88,12 @@ if correct_file and student_file:
     
     st.markdown(f"**🎯 Total Marks Obtained: {total_marks_obtained} / {total_max_marks}**")
     
-    # Option to download results
+    # Option to download results as CSV
     csv = results.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Results", data=csv, file_name="evaluated_results.csv", mime="text/csv")
+    st.download_button("📥 Download Results (CSV)", data=csv, file_name="evaluated_results.csv", mime="text/csv")
+    
+    # Option to download results as PDF
+    if st.button("📥 Download Results (PDF)"):
+        pdf_file = generate_pdf(results, total_marks_obtained, total_max_marks)
+        with open(pdf_file, "rb") as f:
+            st.download_button("📥 Download PDF", f, file_name="evaluation_results.pdf", mime="application/pdf")
