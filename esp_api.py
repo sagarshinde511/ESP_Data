@@ -7,11 +7,20 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Function to extract text from PDF
-def extract_text_from_pdf(pdf_path):
-    doc = fitz.open(pdf_path)  # Open PDF file
+def extract_text_from_pdf(pdf_file):
+    # Save the uploaded PDF file to a temporary location
+    with open("temp.pdf", "wb") as temp_file:
+        temp_file.write(pdf_file.getbuffer())
+    
+    # Open the saved temporary PDF file
+    doc = fitz.open("temp.pdf")
     text = ""
     for page in doc:
         text += page.get_text("text") + "\n"  # Extract text from each page
+    
+    # Clean up temporary file after reading
+    os.remove("temp.pdf")
+    
     return text
 
 # Function to process extracted text into structured format
