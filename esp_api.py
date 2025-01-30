@@ -1,101 +1,118 @@
-import streamlit as st
 import pandas as pd
 import numpy as np
+import fitz  # PyMuPDF for reading PDFs
+import os
+import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from fpdf import FPDF
 
-def evaluate_answers(correct_answers, student_answers):
+# Function to extract text from PDF
+def extract_text_from_pdf(pdf_path):
+    doc = fitz.open(pdf_path)  # Open PDF file
+    text = ""
+    for page in doc:
+        text += page.get_text("text") + "\n"  # Extract text from each page
+    return text
+
+# Function to process extracted text into structured format
+def extract_questions_answers(pdf_text):
+    lines = pdf_text.split("\n")  # Split text into lines
+    questions = []
+    answers = []
+    current_question = None
+    current_answer = ""
+
+    for line in lines:
+        line = line.strip()
+        if line.startswith("Q "):  # Detect question
+            if current_question:
+                questions.append(current_question)
+                answers.append(current_answer.strip())  # Store previous question-answer pair
+            current_question = line  # Start new question
+            current_answer = ""
+        elif current_question:  # Collect answer text
+            current_answer += " " + line
+
+    # Add last question-answer pair
+    if current_question:
+        questions.append(current_question)
+        answers.append(current_answer.strip())
+
+    return questions, answers
+
+# Streamlit Interface
+st.title("Student Answer Evaluation")
+
+# File upload for correct answers CSV
+correct_answers_file = st.file_uploader("Upload the Correct Answers CSV", type=["csv"])
+if correct_answers_file:
+    correct_answers = pd.read_csv(correct_answers_file)
+    st.write(correct_answers)
+
+# File upload for student answers PDF
+student_pdf_file = st.file_uploader("Upload the Student Answers PDF", type=["pdf"])
+if student_pdf_file:
+    # Extract and process the PDF
+    pdf_text = extract_text_from_pdf(student_pdf_file)
+    questions, student_answers = extract_questions_answers(pdf_text)
+
+    # Convert to DataFrame
+    student_answers_df = pd.DataFrame({'Question': questions, 'Answers': student_answers})
+    st.write(student_answers_df)
+
+    # Initialize TF-IDF vectorizer
     vectorizer = TfidfVectorizer()
+
+    # List to store calculated marks
     marks_obtained = []
-    
-    for index, row in student_answers.iterrows():
-        question_id = row['Question']  # Extract the question ID
-        student_answer = row['Answers']  # Extract the student's answer
+
+    # Loop through each student answer and calculate marks
+    for index, row in student_answers_df.iterrows():
+        question_id = row['Question'].strip()  # Remove extra spaces
+        student_answer = row['Answers']
 
         # Find the correct answer for this question
-        correct_answer_row = correct_answers[correct_answers['Question'] == question_id]
-        if correct_answer_row.empty:
-            marks_obtained.append(0)  # Assign 0 if no correct answer is found
+        correct_answer_row = correct_answers[correct_answers['Question'].str.strip() == question_id]
+
+        if correct_answer_row.empty:  # If no match found, skip to the next question
+            st.warning(f"⚠ Warning: Question '{question_id}' not found in correct_answers.csv. Skipping...")
+            marks_obtained.append(0)
             continue
-        
-        correct_answer = correct_answer_row['Answer'].values[0]  # Get correct answer text
+
+        correct_answer = correct_answer_row['Correct_Answer'].values[0]  # Get correct answer text
         max_marks = correct_answer_row['Marks'].values[0]  # Get full marks for this question
-        
+
         # Combine correct and student answer for vectorization
         combined_text = [correct_answer, student_answer]
-        
+
         # Convert both answers into vector form
         vectors = vectorizer.fit_transform(combined_text)
-        
+
         # Compute cosine similarity (ranges from 0 to 1)
         similarity = cosine_similarity(vectors[0:1], vectors[1:2])[0][0]
-        
-        # Assign marks based on similarity
+
+        # Improve scoring function (boost high similarities)
         if similarity > 0.9:
-            assigned_marks = max_marks
+            assigned_marks = max_marks  # Full marks for very high similarity
         elif similarity > 0.75:
-            assigned_marks = max_marks * 0.9
+            assigned_marks = max_marks * 1  # 90% marks
         elif similarity > 0.5:
-            assigned_marks = max_marks * 0.75
+            assigned_marks = max_marks * 0.95  # 75% marks
         elif similarity > 0.3:
-            assigned_marks = max_marks * 0.5
+            assigned_marks = max_marks * 0.8  # 50% marks
         else:
-            assigned_marks = max_marks * similarity  # Proportional marks
+            assigned_marks = max_marks * similarity  # Proportional marks for low similarity
 
-        marks_obtained.append(int(np.ceil(assigned_marks)))  # Round up
-    
-    # Add marks to student answers DataFrame
-    student_answers['Marks_Obtained'] = marks_obtained
-    return student_answers
+        marks_obtained.append(int(np.ceil(assigned_marks)))  # Round up to nearest integer
 
-def generate_pdf(results, total_marks_obtained, total_max_marks):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Student Evaluation Report", ln=True, align='C')
-    pdf.ln(10)
-    
-    for index, row in results.iterrows():
-        pdf.cell(200, 10, txt=f"Q{row['Question']}: {row['Marks_Obtained']} marks", ln=True)
-    
-    pdf.ln(10)
-    pdf.cell(200, 10, txt=f"Total Marks Obtained: {total_marks_obtained} / {total_max_marks}", ln=True)
-    
-    pdf_output = "evaluation_results.pdf"
-    pdf.output(pdf_output)
-    return pdf_output
-def main():
-# Streamlit UI
-    st.title("📊 Student Answer Evaluation System")
-    
-    # File uploaders
-    correct_file = st.file_uploader("Upload Correct Answers CSV", type=["csv"])
-    student_file = st.file_uploader("Upload Student Answers CSV", type=["csv"])
-    
-    if correct_file and student_file:
-        correct_answers = pd.read_csv(correct_file)
-        student_answers = pd.read_csv(student_file)
-        
-        # Process evaluation
-        results = evaluate_answers(correct_answers, student_answers)
-        total_marks_obtained = results['Marks_Obtained'].sum()
-        total_max_marks = correct_answers['Marks'].sum()
-        
-        # Display results
-        st.subheader("🔹 Student Results:")
-        st.dataframe(results[['Question', 'Answers', 'Marks_Obtained']])
-        
-        st.markdown(f"**🎯 Total Marks Obtained: {total_marks_obtained} / {total_max_marks}**")
-        
-        # Option to download results as CSV
-        csv = results.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Results (CSV)", data=csv, file_name="evaluated_results.csv", mime="text/csv")
-        
-        # Option to download results as PDF
-        if st.button("📥 Download Results (PDF)"):
-            pdf_file = generate_pdf(results, total_marks_obtained, total_max_marks)
-            with open(pdf_file, "rb") as f:
-                st.download_button("📥 Download PDF", f, file_name="evaluation_results.pdf", mime="application/pdf")
-if(__name__ == "__main__"):
-    main()
+    student_answers_df['Marks_Obtained'] = marks_obtained
+
+    # Display results
+    st.subheader("Evaluation Results")
+    st.write(student_answers_df)
+
+    # Calculate total marks obtained
+    total_marks_obtained = sum(marks_obtained)
+    total_max_marks = correct_answers['Marks'].sum()
+
+    st.write(f"🎯 Total Marks Obtained: {total_marks_obtained} / {total_max_marks}")
