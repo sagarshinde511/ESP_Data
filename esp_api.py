@@ -65,35 +65,37 @@ def generate_pdf(results, total_marks_obtained, total_max_marks):
     pdf_output = "evaluation_results.pdf"
     pdf.output(pdf_output)
     return pdf_output
-
+def main():
 # Streamlit UI
-st.title("📊 Student Answer Evaluation System")
-
-# File uploaders
-correct_file = st.file_uploader("Upload Correct Answers CSV", type=["csv"])
-student_file = st.file_uploader("Upload Student Answers CSV", type=["csv"])
-
-if correct_file and student_file:
-    correct_answers = pd.read_csv(correct_file)
-    student_answers = pd.read_csv(student_file)
+    st.title("📊 Student Answer Evaluation System")
     
-    # Process evaluation
-    results = evaluate_answers(correct_answers, student_answers)
-    total_marks_obtained = results['Marks_Obtained'].sum()
-    total_max_marks = correct_answers['Marks'].sum()
+    # File uploaders
+    correct_file = st.file_uploader("Upload Correct Answers CSV", type=["csv"])
+    student_file = st.file_uploader("Upload Student Answers CSV", type=["csv"])
     
-    # Display results
-    st.subheader("🔹 Student Results:")
-    st.dataframe(results[['Question', 'Answers', 'Marks_Obtained']])
-    
-    st.markdown(f"**🎯 Total Marks Obtained: {total_marks_obtained} / {total_max_marks}**")
-    
-    # Option to download results as CSV
-    csv = results.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Results (CSV)", data=csv, file_name="evaluated_results.csv", mime="text/csv")
-    
-    # Option to download results as PDF
-    if st.button("📥 Download Results (PDF)"):
-        pdf_file = generate_pdf(results, total_marks_obtained, total_max_marks)
-        with open(pdf_file, "rb") as f:
-            st.download_button("📥 Download PDF", f, file_name="evaluation_results.pdf", mime="application/pdf")
+    if correct_file and student_file:
+        correct_answers = pd.read_csv(correct_file)
+        student_answers = pd.read_csv(student_file)
+        
+        # Process evaluation
+        results = evaluate_answers(correct_answers, student_answers)
+        total_marks_obtained = results['Marks_Obtained'].sum()
+        total_max_marks = correct_answers['Marks'].sum()
+        
+        # Display results
+        st.subheader("🔹 Student Results:")
+        st.dataframe(results[['Question', 'Answers', 'Marks_Obtained']])
+        
+        st.markdown(f"**🎯 Total Marks Obtained: {total_marks_obtained} / {total_max_marks}**")
+        
+        # Option to download results as CSV
+        csv = results.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Results (CSV)", data=csv, file_name="evaluated_results.csv", mime="text/csv")
+        
+        # Option to download results as PDF
+        if st.button("📥 Download Results (PDF)"):
+            pdf_file = generate_pdf(results, total_marks_obtained, total_max_marks)
+            with open(pdf_file, "rb") as f:
+                st.download_button("📥 Download PDF", f, file_name="evaluation_results.pdf", mime="application/pdf")
+if(__name__ == "__main__"):
+    main()
